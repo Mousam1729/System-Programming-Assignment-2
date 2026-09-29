@@ -2,253 +2,231 @@
 .STACK 100H
 
 .DATA
-
-    msgInput DB 13,10,'Enter brackets: $'
-    balanced DB 13,10,'Balanced$'
-    notBalanced DB 13,10,'Non-Balanced$'
-
-    input DB 100 DUP('$')
-
-    bracketStack DB 100 DUP(?)
-    top DW 0
+    MENU        DB 10,13,"--- STRING LIBRARY MENU ---"
+                DB 10,13,"1. STRLEN (Find Length)"
+                DB 10,13,"2. STRCMP (Compare Two Strings)"
+                DB 10,13,"3. STRREV (Reverse String in Place)"
+                DB 10,13,"4. Exit"
+                DB 10,13,"Enter your choice: $"
+                
+    PROMPT1     DB 10,13,"Enter first string: $"
+    PROMPT2     DB 10,13,"Enter second string: $"
+    
+    LEN_MSG     DB 10,13,"Length of the string is: $"
+    REV_MSG     DB 10,13,"Reversed string is: $"
+    EQ_MSG      DB 10,13,"Strings are EQUAL.$"
+    NEQ_MSG     DB 10,13,"Strings are NOT EQUAL.$"
+    
+    STR_BUF1    DB 50, 0, 50 DUP('$')
+    STR_BUF2    DB 50, 0, 50 DUP('$')
 
 .CODE
-
 MAIN PROC
+    MOV AX, @DATA
+    MOV DS, AX
+    MOV ES, AX                  
 
-    MOV AX,@DATA
-    MOV DS,AX
-
-; -----------------------
-; Input
-; -----------------------
-
-    LEA DX,msgInput
-    MOV AH,09H
+MENU_LOOP:
+    LEA DX, MENU
+    MOV AH, 09H
     INT 21H
-
-    LEA DX,input
-    MOV BYTE PTR [input],99
-    MOV AH,0AH
+    
+    MOV AH, 01H
     INT 21H
+    SUB AL, '0'                 
+    
+    CMP AL, 1
+    JNE NOT_1
+    JMP DO_STRLEN
+NOT_1:
+    CMP AL, 2
+    JNE NOT_2
+    JMP DO_STRCMP
+NOT_2:
+    CMP AL, 3
+    JNE NOT_3
+    JMP DO_STRREV
+NOT_3:
+    CMP AL, 4
+    JNE NOT_4
+    JMP EXIT_PROG
+NOT_4:
+    JMP MENU_LOOP               
 
-; -----------------------
-; Initialize stack
-; -----------------------
-
-    MOV top,0
-    LEA SI,input+2
-
-; =======================
-; PROCESS CHARACTER
-; =======================
-
-PROCESS:
-
-    MOV AL,[SI]
-
-    CMP AL,0DH
-    JNE NOT_END
-    JMP END_CHECK
-
-NOT_END:
-
-; -----------------------
-; Opening round (
-; -----------------------
-
-    CMP AL,'('
-    JNE NOT_ROUND_OPEN
-    JMP PUSH_BRACKET
-
-NOT_ROUND_OPEN:
-
-; -----------------------
-; Opening square [
-; -----------------------
-
-    CMP AL,'['
-    JNE NOT_SQUARE_OPEN
-    JMP PUSH_BRACKET
-
-NOT_SQUARE_OPEN:
-
-; -----------------------
-; Opening curly {
-; -----------------------
-
-    CMP AL,'{'
-    JNE NOT_CURLY_OPEN
-    JMP PUSH_BRACKET
-
-NOT_CURLY_OPEN:
-
-; -----------------------
-; Closing round )
-; -----------------------
-
-    CMP AL,')'
-    JNE NOT_ROUND_CLOSE
-    JMP CHECK_ROUND
-
-NOT_ROUND_CLOSE:
-
-; -----------------------
-; Closing square ]
-; -----------------------
-
-    CMP AL,']'
-    JNE NOT_SQUARE_CLOSE
-    JMP CHECK_SQUARE
-
-NOT_SQUARE_CLOSE:
-
-; -----------------------
-; Closing curly }
-; -----------------------
-
-    CMP AL,'}'
-    JNE NEXT_CHARACTER
-    JMP CHECK_CURLY
-
-; =======================
-; PUSH OPENING BRACKET
-; =======================
-
-PUSH_BRACKET:
-
-    MOV BX,top
-    MOV bracketStack[BX],AL
-    INC top
-
-    JMP NEXT_CHARACTER
-
-; =======================
-; CHECK ROUND )
-; =======================
-
-CHECK_ROUND:
-
-    CMP top,0
-    JNE ROUND_NOT_EMPTY
-    JMP NOT_BALANCED
-
-ROUND_NOT_EMPTY:
-
-    DEC top
-    MOV BX,top
-    MOV AL,bracketStack[BX]
-
-    CMP AL,'('
-    JNE ROUND_WRONG
-    JMP NEXT_CHARACTER
-
-ROUND_WRONG:
-
-    JMP NOT_BALANCED
-
-; =======================
-; CHECK SQUARE ]
-; =======================
-
-CHECK_SQUARE:
-
-    CMP top,0
-    JNE SQUARE_NOT_EMPTY
-    JMP NOT_BALANCED
-
-SQUARE_NOT_EMPTY:
-
-    DEC top
-    MOV BX,top
-    MOV AL,bracketStack[BX]
-
-    CMP AL,'['
-    JNE SQUARE_WRONG
-    JMP NEXT_CHARACTER
-
-SQUARE_WRONG:
-
-    JMP NOT_BALANCED
-
-; =======================
-; CHECK CURLY }
-; =======================
-
-CHECK_CURLY:
-
-    CMP top,0
-    JNE CURLY_NOT_EMPTY
-    JMP NOT_BALANCED
-
-CURLY_NOT_EMPTY:
-
-    DEC top
-    MOV BX,top
-    MOV AL,bracketStack[BX]
-
-    CMP AL,'{'
-    JNE CURLY_WRONG
-    JMP NEXT_CHARACTER
-
-CURLY_WRONG:
-
-    JMP NOT_BALANCED
-
-; =======================
-; NEXT CHARACTER
-; =======================
-
-NEXT_CHARACTER:
-
-    INC SI
-    JMP PROCESS
-
-; =======================
-; END OF INPUT
-; =======================
-
-END_CHECK:
-
-    CMP top,0
-    JNE STACK_NOT_EMPTY
-    JMP BALANCED_RESULT
-
-STACK_NOT_EMPTY:
-
-    JMP NOT_BALANCED
-
-; =======================
-; BALANCED
-; =======================
-
-BALANCED_RESULT:
-
-    LEA DX,balanced
-    MOV AH,09H
+DO_STRLEN:
+    LEA DX, PROMPT1
+    MOV AH, 09H
     INT 21H
-
-    JMP EXIT_PROGRAM
-
-; =======================
-; NON-BALANCED
-; =======================
-
-NOT_BALANCED:
-
-    LEA DX,notBalanced
-    MOV AH,09H
+    LEA DX, STR_BUF1
+    CALL READ_STR
+    
+    LEA SI, STR_BUF1 + 2        
+    CALL STRLEN                 
+    
+    LEA DX, LEN_MSG
+    MOV AH, 09H
     INT 21H
-
-; =======================
-; EXIT
-; =======================
-
-EXIT_PROGRAM:
-
-    MOV AH,4CH
+    
+    MOV AX, CX
+    ADD AL, '0'
+    MOV DL, AL
+    MOV AH, 02H
     INT 21H
+    JMP MENU_LOOP
 
+DO_STRCMP:
+    LEA DX, PROMPT1
+    MOV AH, 09H
+    INT 21H
+    LEA DX, STR_BUF1
+    CALL READ_STR
+    
+    LEA DX, PROMPT2
+    MOV AH, 09H
+    INT 21H
+    LEA DX, STR_BUF2
+    CALL READ_STR
+    
+    LEA SI, STR_BUF1 + 2
+    LEA DI, STR_BUF2 + 2
+    CALL STRCMP
+    
+    CMP AX, 0
+    JE  STRINGS_MATCH
+    LEA DX, NEQ_MSG
+    JMP PRINT_CMP_RES
+STRINGS_MATCH:
+    LEA DX, EQ_MSG
+PRINT_CMP_RES:
+    MOV AH, 09H
+    INT 21H
+    JMP MENU_LOOP
+
+DO_STRREV:
+    LEA DX, PROMPT1
+    MOV AH, 09H
+    INT 21H
+    LEA DX, STR_BUF1
+    CALL READ_STR
+    
+    LEA SI, STR_BUF1 + 2
+    CALL STRREV                 
+    
+    LEA DX, REV_MSG
+    MOV AH, 09H
+    INT 21H
+    
+    LEA DX, STR_BUF1 + 2        
+    MOV AH, 09H
+    INT 21H
+    JMP MENU_LOOP
+
+EXIT_PROG:
+    MOV AH, 4CH                 
+    INT 21H
 MAIN ENDP
+
+; READ_STR Function
+
+READ_STR PROC NEAR
+    PUSH BX                     
+    PUSH DX
+
+    MOV AH, 0AH                 
+    INT 21H
+    
+    MOV BX, DX                  
+    XOR DX, DX
+    MOV DL, [BX + 1]            
+    ADD BX, DX                  
+    MOV BYTE PTR [BX + 2], '$'  
+    
+    POP DX
+    POP BX
+    RET
+READ_STR ENDP
+
+; STRLEN FUNCTION
+
+STRLEN PROC NEAR
+    PUSH SI
+    XOR CX, CX                  
+LEN_CON_LOOP:
+    CMP BYTE PTR [SI], '$'      
+    JE  LEN_DONE
+    CMP BYTE PTR [SI], 13       
+    JE  LEN_DONE
+    INC CX
+    INC SI
+    JMP LEN_CON_LOOP
+LEN_DONE:
+    POP SI
+    RET
+STRLEN ENDP
+
+; STRCMP FUNCTION
+
+STRCMP PROC NEAR
+    PUSH SI
+    PUSH DI
+CMP_LOOP:
+    MOV AL, [SI]
+    MOV BL, [DI]
+    CMP AL, BL                  
+    JNE MISMATCH
+    CMP AL, '$'                  
+    JE  MATCHED
+    INC SI
+    INC DI
+    JMP CMP_LOOP
+MISMATCH:
+    MOV AX, 1                   
+    JMP CMP_EXIT
+MATCHED:
+    MOV AX, 0                   
+CMP_EXIT:
+    POP DI
+    POP SI
+    RET
+STRCMP ENDP
+
+; STRREV FUNCTION
+
+STRREV PROC NEAR
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH SI
+    PUSH DI
+
+    CALL STRLEN                 
+    CMP CX, 1                   
+    JLE REV_DONE
+    
+    MOV DI, SI
+    ADD DI, CX
+    DEC DI                      
+
+REV_LOOP:
+    CMP SI, DI                  
+    JGE REV_DONE
+    
+    MOV AL, [SI]
+    MOV BL, [DI]
+    MOV [SI], BL
+    MOV [DI], AL
+    
+    INC SI                      
+    DEC DI                      
+    JMP REV_LOOP
+
+REV_DONE:
+    POP DI
+    POP SI
+    POP CX
+    POP BX
+    POP AX
+    RET
+STRREV ENDP
 
 END MAIN

@@ -1,216 +1,120 @@
 .MODEL SMALL
 .STACK 100H
-
 .DATA
-
-    msgN DB 13,10,'Enter number of requests: $'
-    msgReq DB 13,10,'Enter request: $'
-    msgHead DB 13,10,'Enter initial head position: $'
-
-    msgResult DB 13,10,'Total head movement = $'
-
-    n DW ?
-    head DW ?
-    total DW 0
-
-    requests DW 50 DUP(?)
+    PROMPT          DB 'Enter a 2-digit hex value (0-9, A-F): $'
+    RESULT_MSG      DB 0Dh, 0Ah, 'The corresponding ASCII character is: $'
+    HEX_INPUT       DB ?                    
+    HIGH_CHAR       DB ?                    
+    LOW_CHAR        DB ?                    
+    NEWLINE         DB 0Dh, 0Ah, '$'
 
 .CODE
-
 MAIN PROC
-    MOV AX,@DATA
-    MOV DS,AX
+    MOV AX, @DATA                       
+    MOV DS, AX               
 
-; -----------------------------
-; Read number of requests
-; -----------------------------
+    ; 1. Display Prompt        
+    MOV AH, 09h
+    LEA DX, PROMPT
+    INT 21h         
 
-    LEA DX,msgN
-    MOV AH,09H
-    INT 21H
+    ; 2. Read and Validate First Character (High Nibble)    
+GET_HIGH_CHAR:
+    MOV AH, 07h                      ; DOS function: Read character WITHOUT echo
+    INT 21h                          ; Character is now in AL        
+    
+    ; Validate: Is it between '0' and '9'?
+    CMP AL, '0'
+    JB  INVALID_HIGH                 ; Less than '0' -> Invalid
+    CMP AL, '9'
+    JBE VALID_HIGH                   ; Between '0' and '9' -> Valid        
+    
+    ; Validate: Is it between 'A' and 'F'?
+    CMP AL, 'A'
+    JB  INVALID_HIGH                 ; Between '9' and 'A' -> Invalid
+    CMP AL, 'F'
+    JBE VALID_HIGH                   ; Between 'A' and 'F' -> Valid
 
-    CALL READ_NUMBER
-    MOV n,AX
+INVALID_HIGH:
+    ; Print a beep sound to alert the user
+    MOV AH, 02h
+    MOV DL, 07h                      ; ASCII 07h is the system beep (bell)
+    INT 21h
+    JMP GET_HIGH_CHAR                ; Repeat loop until valid input
 
-; -----------------------------
-; Read requests
-; -----------------------------
+VALID_HIGH:
+    MOV HIGH_CHAR, AL                ; Save the valid ASCII character
+    MOV AH, 02h                      ; Manually echo the valid character to screen
+    MOV DL, AL
+    INT 21h         
 
-    LEA SI,requests
-    MOV CX,n
+    ; 3. Read and Validate Second Character (Low Nibble)    
+GET_LOW_CHAR:
+    MOV AH, 07h                      ; Read without echo
+    INT 21h        
+    
+    ; Validate '0'-'9'
+    CMP AL, '0'
+    JB  INVALID_LOW
+    CMP AL, '9'
+    JBE VALID_LOW        
+    
+    ; Validate 'A'-'F'
+    CMP AL, 'A'
+    JB  INVALID_LOW
+    CMP AL, 'F'
+    JBE VALID_LOW
 
-READ_REQUESTS:
+INVALID_LOW:
+    MOV AH, 02h
+    MOV DL, 07h                      ; Beep
+    INT 21h
+    JMP GET_LOW_CHAR                 ; Repeat loop until valid input
 
-    LEA DX,msgReq
-    MOV AH,09H
-    INT 21H
+VALID_LOW:
+    MOV LOW_CHAR, AL                 ; Save the valid ASCII character
+    MOV AH, 02h                      ; Manually echo the valid character
+    MOV DL, AL
+    INT 21h         
 
-    CALL READ_NUMBER
-    MOV [SI],AX
+    ; 4. Convert Valid ASCII Characters to a Single Byte    
+    ; Process High Character
+    MOV AL, HIGH_CHAR
+    CMP AL, '9'
+    JBE CONVERT_HIGH_INPUT
+    SUB AL, 7                        ; Adjust for 'A'-'F'
+CONVERT_HIGH_INPUT:
+    SUB AL, 30h                      ; Convert to raw value (0-15)
+    MOV CL, 4
+    SHL AL, CL                       ; Shift to high nibble
+    MOV HEX_INPUT, AL                    
 
-    ADD SI,2
-    LOOP READ_REQUESTS
+    ; Process Low Character
+    MOV AL, LOW_CHAR
+    CMP AL, '9'
+    JBE CONVERT_LOW_INPUT
+    SUB AL, 7                        ; Adjust for 'A'-'F'
+CONVERT_LOW_INPUT:
+    SUB AL, 30h                      ; Convert to raw value (0-15)
+    OR HEX_INPUT, AL                 ; Combine into HEX_INPUT         
 
-; -----------------------------
-; Read initial head
-; -----------------------------
+    ; 5. Display Result Heading    
+    MOV AH, 09h
+    LEA DX, RESULT_MSG
+    INT 21h         
 
-    LEA DX,msgHead
-    MOV AH,09H
-    INT 21H
+    ; 6. Print the Actual ASCII Character
+    MOV AH, 02h                           
+    MOV DL, HEX_INPUT                ; Load the combined raw numeric byte into DL
+    INT 21h                          ; AH=02h prints whatever character maps to this ASCII value
 
-    CALL READ_NUMBER
-    MOV head,AX
+    ; Print a final newline    
+    MOV AH, 09h
+    LEA DX, NEWLINE
+    INT 21h    
 
-; -----------------------------
-; FCFS calculation
-; -----------------------------
-
-    LEA SI,requests
-    MOV CX,n
-    MOV BX,head
-
-CALCULATE:
-
-    MOV AX,[SI]
-
-    CMP AX,BX
-    JAE POSITIVE
-
-; BX - AX
-    MOV DX,BX
-    SUB DX,AX
-    ADD total,DX
-    JMP NEXT
-
-POSITIVE:
-
-; AX - BX
-    SUB AX,BX
-    ADD total,AX
-
-NEXT:
-    MOV BX,[SI]
-    ADD SI,2
-
-    LOOP CALCULATE
-
-; -----------------------------
-; Display result
-; -----------------------------
-
-    LEA DX,msgResult
-    MOV AH,09H
-    INT 21H
-
-    MOV AX,total
-    CALL PRINT_NUMBER
-
-    MOV AH,4CH
-    INT 21H
-
-; -----------------------------
-; READ NUMBER
-; -----------------------------
-
-READ_NUMBER PROC
-
-    PUSH BX
-    PUSH CX
-    PUSH DX
-
-    XOR BX,BX
-
-READ_LOOP:
-
-    MOV AH,01H
-    INT 21H
-
-    CMP AL,0DH
-    JE READ_DONE
-
-    SUB AL,'0'
-
-    XOR AH,AH
-    PUSH AX
-
-    MOV AX,BX
-    MOV CX,10
-    MUL CX
-    MOV BX,AX
-
-    POP AX
-    ADD BX,AX
-
-    JMP READ_LOOP
-
-READ_DONE:
-
-    MOV AX,BX
-
-    POP DX
-    POP CX
-    POP BX
-
-    RET
-
-READ_NUMBER ENDP
-
-; -----------------------------
-; PRINT NUMBER
-; -----------------------------
-
-PRINT_NUMBER PROC
-
-    PUSH AX
-    PUSH BX
-    PUSH CX
-    PUSH DX
-
-    CMP AX,0
-    JNE CONVERT
-
-    MOV DL,'0'
-    MOV AH,02H
-    INT 21H
-    JMP PRINT_DONE
-
-CONVERT:
-
-    XOR CX,CX
-    MOV BX,10
-
-DIVIDE:
-
-    XOR DX,DX
-    DIV BX
-
-    PUSH DX
-    INC CX
-
-    CMP AX,0
-    JNE DIVIDE
-
-PRINT_LOOP:
-
-    POP DX
-    ADD DL,'0'
-
-    MOV AH,02H
-    INT 21H
-
-    LOOP PRINT_LOOP
-
-PRINT_DONE:
-
-    POP DX
-    POP CX
-    POP BX
-    POP AX
-
-    RET
-
-PRINT_NUMBER ENDP
-
+    ; Terminate Program
+    MOV AH, 4Ch                         
+    INT 21h
 MAIN ENDP
 END MAIN

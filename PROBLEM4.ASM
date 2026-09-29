@@ -1,238 +1,235 @@
-.MODEL SMALL
-.STACK 100H
-
-.DATA
-
-    msgN DB 13,10,'Enter number of elements: $'
-    msgElement DB 13,10,'Enter element: $'
-    msgBefore DB 13,10,'Array before sorting: $'
-    msgAfter DB 13,10,'Array after sorting: $'
-    space DB ' $'
-
-    n DW ?
-    arr DW 50 DUP(?)
-
-.CODE
-
-MAIN PROC
-    MOV AX,@DATA
-    MOV DS,AX
-
-; -----------------------
-; Read n
-; -----------------------
-
-    LEA DX,msgN
-    MOV AH,09H
-    INT 21H
-
-    CALL READ_NUMBER
-    MOV n,AX
-
-; -----------------------
-; Read array
-; -----------------------
-
-    LEA SI,arr
-    MOV CX,n
-
-INPUT_LOOP:
-
-    LEA DX,msgElement
-    MOV AH,09H
-    INT 21H
-
-    CALL READ_NUMBER
-    MOV [SI],AX
-
-    ADD SI,2
-    LOOP INPUT_LOOP
-
-; -----------------------
-; Display before sorting
-; -----------------------
-
-    LEA DX,msgBefore
-    MOV AH,09H
-    INT 21H
-
-    CALL DISPLAY_ARRAY
-
-; -----------------------
-; Bubble sort
-; -----------------------
-
-    MOV CX,n
-    DEC CX
-
-OUTER:
-
-    PUSH CX
-
-    LEA SI,arr
-    MOV CX,n
-    DEC CX
-
-INNER:
-
-    MOV AX,[SI]
-    MOV BX,[SI+2]
-
-    CMP AX,BX
-    JBE NO_SWAP
-
-; Swap
-    MOV [SI],BX
-    MOV [SI+2],AX
-
-NO_SWAP:
-
-    ADD SI,2
-    LOOP INNER
-
-    POP CX
-    LOOP OUTER
-
-; -----------------------
-; Display after sorting
-; -----------------------
-
-    LEA DX,msgAfter
-    MOV AH,09H
-    INT 21H
-
-    CALL DISPLAY_ARRAY
-
-    MOV AH,4CH
-    INT 21H
-
-; =======================
-; READ NUMBER
-; =======================
-
-READ_NUMBER PROC
-
-    PUSH BX
-    PUSH CX
-    PUSH DX
-
-    XOR BX,BX
-
-READ:
-
-    MOV AH,01H
-    INT 21H
-
-    CMP AL,0DH
-    JE DONE_READ
-
-    SUB AL,'0'
-    XOR AH,AH
-
-    PUSH AX
-
-    MOV AX,BX
-    MOV CX,10
-    MUL CX
-    MOV BX,AX
-
-    POP AX
-    ADD BX,AX
-
-    JMP READ
-
-DONE_READ:
-
-    MOV AX,BX
-
-    POP DX
-    POP CX
-    POP BX
-
-    RET
-
-READ_NUMBER ENDP
-
-; =======================
-; DISPLAY ARRAY
-; =======================
-
-DISPLAY_ARRAY PROC
-
-    LEA SI,arr
-    MOV CX,n
-
-DISPLAY:
-
-    MOV AX,[SI]
-    CALL PRINT_NUMBER
-
-    LEA DX,space
-    MOV AH,09H
-    INT 21H
-
-    ADD SI,2
-    LOOP DISPLAY
-
-    RET
-
-DISPLAY_ARRAY ENDP
-
-; =======================
-; PRINT NUMBER
-; =======================
-
-PRINT_NUMBER PROC
-
-    PUSH AX
-    PUSH BX
-    PUSH CX
-    PUSH DX
-
-    CMP AX,0
-    JNE CONVERT
-
-    MOV DL,'0'
-    MOV AH,02H
-    INT 21H
-    JMP PRINT_DONE
-
-CONVERT:
-
-    XOR CX,CX
-    MOV BX,10
-
-DIVIDE:
-
-    XOR DX,DX
-    DIV BX
-
-    PUSH DX
-    INC CX
-
-    CMP AX,0
-    JNE DIVIDE
-
-PRINT:
-
-    POP DX
-    ADD DL,'0'
-
-    MOV AH,02H
-    INT 21H
-
-    LOOP PRINT
-
-PRINT_DONE:
-
-    POP DX
-    POP CX
-    POP BX
-    POP AX
-
-    RET
-
-PRINT_NUMBER ENDP
-
-MAIN ENDP
-END MAIN
+.model small
+.stack 100h
+
+.data
+    menu    db 10, 13, "--- MASM CALCULATOR ---"
+            db 10, 13, "1. Addition (+)"
+            db 10, 13, "2. Subtraction (-)"
+            db 10, 13, "3. Multiplication (*)"
+            db 10, 13, "4. Division (/)"
+            db 10, 13, "Enter choice (1-4): $"
+    
+    msg1    db 10, 13, "Enter first number: $"
+    msg2    db 10, 13, "Enter second number: $"
+    msgRes  db 10, 13, "Result: $"
+    msgErr  db 10, 13, "Invalid Choice!$"
+    msgRem  db " Remainder: $"
+    msgNeg  db "-$"
+    
+    num1    dw ?        
+    num2    dw ?
+    choice  db ?
+
+.code
+main:
+    mov ax, @data
+    mov ds, ax
+
+display_menu:
+    mov ah, 09h
+    lea dx, menu
+    int 21h
+
+    mov ah, 01h
+    int 21h
+    mov choice, al
+
+    cmp choice, '1'
+    jl handle_invalid
+    cmp choice, '4'
+    jg handle_invalid
+    jmp get_inputs
+
+handle_invalid:
+    jmp NEAR ptr invalid_choice
+
+get_inputs:
+    mov ah, 09h
+    lea dx, msg1
+    int 21h
+    call ReadNum
+    mov num1, ax
+
+    mov ah, 09h
+    lea dx, msg2
+    int 21h
+    call ReadNum
+    mov num2, ax
+
+    mov ah, 09h
+    lea dx, msgRes
+    int 21h
+
+    cmp choice, '1'
+    jne check_sub
+    jmp NEAR ptr op_add
+check_sub:
+    cmp choice, '2'
+    jne check_mul
+    jmp NEAR ptr op_sub
+check_mul:
+    cmp choice, '3'
+    jne check_div
+    jmp NEAR ptr op_mul
+check_div:
+    cmp choice, '4'
+    jne handle_invalid
+    jmp NEAR ptr op_div
+
+op_add:
+    mov ax, num1
+    add ax, num2
+    call PrintNum
+    jmp NEAR ptr exit_prog
+
+op_sub:
+    mov ax, num1
+    cmp ax, num2
+    jge sub_positive
+    
+    push ax
+    mov ah, 09h
+    lea dx, msgNeg
+    int 21h
+    pop ax
+    
+    mov bx, num2
+    sub bx, ax
+    mov ax, bx
+    jmp print_sub_res
+sub_positive:
+    sub ax, num2
+print_sub_res:
+    call PrintNum
+    jmp NEAR ptr exit_prog
+
+op_mul:
+    mov ax, num1
+    mul num2            
+    call PrintNum
+    jmp NEAR ptr exit_prog
+
+op_div:
+    cmp num2, 0
+    je div_by_zero
+    
+    mov ax, num1
+    xor dx, dx          
+    mov bx, num2
+    div bx              
+    
+    push dx             
+    call PrintNum       
+    
+    mov ah, 09h
+    lea dx, msgRem
+    int 21h
+    pop ax              
+    call PrintNum
+    jmp NEAR ptr exit_prog
+
+div_by_zero:
+    mov ah, 09h
+    lea dx, msgErr
+    int 21h
+    jmp NEAR ptr exit_prog
+
+invalid_choice:
+    mov ah, 09h
+    lea dx, msgErr
+    int 21h
+
+exit_prog:
+    mov ah, 4Ch
+    int 21h
+
+
+; PROCEDURE: ReadNum (Fixed Multi-Digit Logic)
+
+ReadNum proc
+    push bx
+    push cx
+    push dx
+    
+    xor bx, bx          ; BX builds our final value
+    xor cx, cx          ; CH = temporary digit, CL = flag for digits entered
+
+read_loop:
+    mov ah, 01h         
+    int 21h
+    
+    cmp al, 13          ; Enter key?
+    je check_enter
+    
+    cmp al, '0'         
+    jl skip_digit
+    cmp al, '9'         
+    jg skip_digit
+    
+    sub al, '0'
+    mov ch, al          ; Store current digit safely in CH
+    inc cl              ; Increment digit counter
+    
+    ; Safely multiply running sum by 10: BX = BX * 10
+    mov ax, bx
+    mov dx, 10
+    mul dx
+    mov bx, ax          ; BX = BX * 10
+    
+    ; Add current digit
+    xor ax, ax
+    mov al, ch          ; AX = current digit
+    add bx, ax          ; Accumulate into BX
+    jmp read_loop
+
+skip_digit:
+    jmp read_loop
+
+check_enter:
+    cmp cl, 0           
+    jne done_reading
+    jmp read_loop       
+
+done_reading:
+    mov ax, bx          ; Return result cleanly in AX
+    pop dx
+    pop cx
+    pop bx
+    ret
+ReadNum endp
+
+; PROCEDURE: PrintNum
+
+PrintNum proc
+    push ax
+    push bx
+    push cx
+    push dx
+    
+    xor cx, cx          
+    mov bx, 10          
+
+split_digits:
+    xor dx, dx
+    div bx              
+    push dx             
+    inc cx
+    cmp ax, 0
+    jne split_digits
+
+print_loop:
+    pop dx              
+    add dl, '0'         
+    mov ah, 02h         
+    int 21h
+    loop print_loop
+    
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+PrintNum endp
+
+end main
+ 
